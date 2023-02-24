@@ -4,11 +4,10 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <signal.h>
 #define CHILD_PATH "CHILD_PATH"
 #define CHILD_PATH_KEY_LENGTH 11
 #define CHILD_PROGRAM_NAME "child"
-
-void (*process_action) (pid_t);
 
 char* childName(int childNumber)
 {
@@ -65,20 +64,19 @@ pid_t lastProcess(pid_t* processesPid, int size)
 
 void showProcessInfo(pid_t pid)
 {
-    printf("pid = %d", pid);
+    printf("pid = %d\n", pid);
 }
 
-void allProcessAction(pid_t* processesPid, int size, process_action* action)
+void allProcessAction(pid_t* processesPid, int size, void (*process_action) (pid_t))
 {
     for(int i = 0; i < size; i++)
-        action(processesPid[i]);
+        process_action(processesPid[i]);
 }
 
 void killProcess(pid_t pid)
 {
     kill(pid, 9);
 }
-
 
 int main(int argc, char** argv, char** envp)
 {
@@ -88,7 +86,7 @@ int main(int argc, char** argv, char** envp)
     pid_t* processesPid = (pid_t*) malloc(255*sizeof(pid_t));
     while(1)
     {
-        printf("\n\ninput character: ");
+        printf("\n\nInput character: ");
 
         rewind(stdin);
 
@@ -99,15 +97,15 @@ int main(int argc, char** argv, char** envp)
             char* cName = childName(childProcessesCount);
             char** cArgv = createChildProcessArgv(cName);
             char* programPath = childProgramPath();
-            pid_t newProcessPid = createChildProcess(programPath, cArgv, NULL);
+            pid_t newProcessPid = createChildProcess(programPath, cArgv);
             processesPid[childProcessesCount++] = newProcessPid;
             printf("New process was created, pid = %d", newProcessPid);
         }
         else if(ch == '-')
         {
             pid_t last_process = lastProcess(processesPid, childProcessesCount--);
-            kill(lastProcess, 9);
-            printf("Process with pid = %d was killed\nCount: ", lastProcess, childProcessesCount);
+            killProcess(last_process);
+            printf("Process with pid = %d was killed\nCount: %d", (int)last_process , childProcessesCount);
         }
         else if(ch == 'l')
             allProcessAction(processesPid, childProcessesCount, showProcessInfo);
@@ -115,11 +113,10 @@ int main(int argc, char** argv, char** envp)
         {
             allProcessAction(processesPid, childProcessesCount, killProcess);
             printf("All processes were removed\n");
-            
+            childProcessesCount=0;
             if(ch == 'q')
                 break;
         }
-            
     }
     return 0;   
 }
