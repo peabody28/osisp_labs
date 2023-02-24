@@ -9,6 +9,12 @@
 #define CHILD_PATH_KEY_LENGTH 11
 #define CHILD_PROGRAM_NAME "child"
 
+struct childProcess
+{
+    pid_t pid;
+    int number;
+};
+
 char* childName(int childNumber)
 {
     char* name = (char*) malloc(32*sizeof(char));
@@ -33,7 +39,6 @@ pid_t createChildProcess(char* programPath, char** argv)
     else if(p > 0)
     {
         printf("Parent PID = %d\n", getpid());
-        wait(NULL);
     }   
     return p;
 }
@@ -57,25 +62,37 @@ char** createChildProcessArgv(char* name)
     return argv;
 }
 
-pid_t lastProcess(pid_t* processesPid, int size)
+void showProcessInfo(struct childProcess pr)
 {
-    return processesPid[size-1];
+    printf("pid = %d\n", pr.pid);
 }
 
-void showProcessInfo(pid_t pid)
-{
-    printf("pid = %d\n", pid);
-}
-
-void allProcessAction(pid_t* processesPid, int size, void (*process_action) (pid_t))
+void allProcessAction(struct childProcess* processesPid, int size, void (*process_action) (struct childProcess))
 {
     for(int i = 0; i < size; i++)
         process_action(processesPid[i]);
 }
 
-void killProcess(pid_t pid)
+void killProcess(struct childProcess pr)
 {
-    kill(pid, 9);
+    kill(pr.pid, SIGKILL);
+}
+
+void muteProcess(struct childProcess pr)
+{
+    kill(pr.pid, SIGUSR2);
+}
+
+void unmuteProcess(struct childProcess pr)
+{
+    kill(pr.pid, SIGUSR1);
+}
+
+struct childProcess findChild(struct childProcess* list, int size, int number)
+{
+    for(int i = 0; i < size; i++)
+        if(list[i].number == number)
+            return list[i];
 }
 
 int main(int argc, char** argv, char** envp)
@@ -83,39 +100,72 @@ int main(int argc, char** argv, char** envp)
     int childProcessesCount = 0;
 
     char ch;
-    pid_t* processesPid = (pid_t*) malloc(255*sizeof(pid_t));
+    struct childProcess* processesPid = (struct childProcess*) malloc(255*sizeof(struct childProcess));
     while(1)
     {
-        printf("\n\nInput character: ");
+        printf("\n\nInput character:\n");
 
         rewind(stdin);
 
-        ch = getchar(); getchar();
-        
-        if(ch == '+')
+        char buff[3]; buff[2] = '\0';
+        scanf("%s", buff);
+        if(!strcmp(buff, "+"))
         {
             char* cName = childName(childProcessesCount);
             char** cArgv = createChildProcessArgv(cName);
             char* programPath = childProgramPath();
             pid_t newProcessPid = createChildProcess(programPath, cArgv);
-            processesPid[childProcessesCount++] = newProcessPid;
+            
+            struct childProcess tmp;
+            tmp.pid = newProcessPid;
+            tmp.number = childProcessesCount;
+
+            processesPid[childProcessesCount++] = tmp;
             printf("New process was created, pid = %d", newProcessPid);
         }
-        else if(ch == '-')
+        else if(!strcmp(buff, "-"))
         {
-            pid_t last_process = lastProcess(processesPid, childProcessesCount--);
-            killProcess(last_process);
-            printf("Process with pid = %d was killed\nCount: %d", (int)last_process , childProcessesCount);
+            struct childProcess lastChildProcess = processesPid[childProcessesCount-1];
+            killProcess(lastChildProcess);
+            printf("Process with pid = %d was killed\nCount: %d", (int)lastChildProcess.pid , --childProcessesCount);
         }
-        else if(ch == 'l')
+        else if(!strcmp(buff, "l"))
             allProcessAction(processesPid, childProcessesCount, showProcessInfo);
-        else if(ch == 'k' || ch == 'q')
+
+        else if(!strcmp(buff, "k") || !strcmp(buff, "q"))
         {
             allProcessAction(processesPid, childProcessesCount, killProcess);
             printf("All processes were removed\n");
             childProcessesCount=0;
-            if(ch == 'q')
-                break;
+            if(!strcmp(buff, "q")) break;
+        }
+        else if(!strcmp(buff, "s") || buff[0] == 'p')
+        {
+            allProcessAction(processesPid, childProcessesCount, muteProcess);
+            printf("All processes were muted\n");
+            if(buff[0] == 'p')
+            {
+                struct childProcess child = findChild(processesPid, childProcessesCount, buff[1]-'0');
+                unmuteProcess(child);
+                printf("Child number %d is unmuted\n", child.number);
+            }
+        }
+        else if(buff[0] == 's')
+        {
+            struct childProcess child = findChild(processesPid, childProcessesCount, buff[1]-'0');
+            muteProcess(child);
+            printf("Child number %d is muted\n", child.number);
+        }
+        else if(!strcmp(buff, "g"))
+        {
+            allProcessAction(processesPid, childProcessesCount, unmuteProcess);
+            printf("All processes were unmuted\n");
+        }
+        else if(buff[0] == 'g')
+        {
+            struct childProcess child = findChild(processesPid, childProcessesCount, buff[1]-'0');
+            unmuteProcess(child);
+            printf("Child number %d is unmuted\n", child.number);
         }
     }
     return 0;   
