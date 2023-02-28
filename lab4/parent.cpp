@@ -10,48 +10,14 @@
 #include <semaphore.h>
 #include <queue>
 #include <sys/shm.h>
+#include "datastruct.h"
 #define CHILD_PATH "./"
 #define CHILD_PROGRAM_NAME "child"
-#define shmsz 20
 #define perms 0777
 #define SHM_KEY 0x1234
 #define SEMAPHORE_NAME "/semName"
 
 using namespace std;
-
-class Message
-{
-public:
-    char type;
-    short hash; // hashsum
-    char size;
-    char data[255];
-
-    Message(){}
-};
-
-class QueueExtension
-{
-public:
-    Message messages[255];
-    int inCount = 0;
-    int outCount = 0;
-    void push(Message m)
-    {
-        messages[inCount-outCount] = m;
-        inCount++;
-    }
-
-    Message pop()
-    {
-        return messages[inCount - outCount++ -1];
-    }
-
-    bool isEmpty()
-    {
-        return inCount == outCount;
-    }
-};
 
 string childName(int childNumber)
 {
@@ -95,13 +61,8 @@ char** createChildProcessArgv(const char* name, int type)
 
 int main(int argc, char** argv, char** envp)
 {
-    int shmid;
-    QueueExtension *broker;
-    shmid = shmget(SHM_KEY, sizeof(QueueExtension), IPC_CREAT | perms);
-    cout << shmid << endl;
-    broker = (QueueExtension*) shmat(shmid, NULL, 0);
-    if(!broker)
-        return 1;
+    int shmid = shmget(SHM_KEY, sizeof(QueueExtension), IPC_CREAT | perms);
+    QueueExtension *broker = (QueueExtension*) shmat(shmid, NULL, 0);
     broker->inCount = broker->outCount = 0;
 
     sem_t* sem = sem_open(SEMAPHORE_NAME, O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR, 1);

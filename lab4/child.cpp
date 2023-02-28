@@ -7,52 +7,23 @@
 #include <queue>
 #include <sys/shm.h>
 #include <semaphore.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
-#define shmsz 20
+#include <functional>
+#include "datastruct.h"
 #define perms 0777
 #define SHM_KEY 0x1234
 #define SEMAPHORE_NAME "/semName"
 
 using namespace std;
 
-class Message
+bool tryAddMessage(QueueExtension *broker, Message m)
 {
-public:
-    char type;
-    short hash; // hashsum
-    char size;
-    char data[255];
-
-    Message(){}
-};
-
-class QueueExtension
-{
-public:
-    Message messages[255];
-    int inCount = 0;
-    int outCount = 0;
-    void push(Message m)
-    {
-        messages[inCount-outCount] = m;
-        inCount++;
-    }
-
-    Message pop()
-    {
-        return messages[inCount - outCount++ -1];
-    }
-
-    bool isEmpty()
-    {
-        return inCount == outCount;
-    }
-};
-
-void addMessage(QueueExtension *broker, Message m)
-{
+    if(broker->inCount >= 255)
+        return false;
     broker->push(m);
+    return true;
 }
 
 bool tryReadMessage(QueueExtension *broker, Message* msg)
@@ -63,31 +34,64 @@ bool tryReadMessage(QueueExtension *broker, Message* msg)
     return true;
 }
 
+char* randstring(int length) {
+
+    static char charset[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789,.-#'?!";        
+    char *randomString = NULL;
+
+    if (length) 
+    {
+        randomString = new char[length+1];
+
+        if (randomString) {            
+            for (int n = 0;n < length;n++) {            
+                int key = rand() % (int)(sizeof(charset) -1);
+                randomString[n] = charset[key];
+            }
+
+            randomString[length] = '\0';
+        }
+    }
+
+    return randomString;
+}
+
 Message generateMessage()
 {
     Message m;
     int num = rand();
     int size = num % 257;
     m.size = size;
+    int dataSize = ((size+3)/4)*4;    
 
-    int dataSize = ((size+3)/4)*4;
-    strcpy(m.data, "data");
+    strcpy(m.data, randstring(dataSize));
 
     m.hash = dataSize + m.size;
     return m;
 }
 
+void lockAction(sem_t * sem, const function<void()>& f)
+{
+	try
+	{
+		sem_wait(sem);
+		f();
+		sem_post(sem);
+	}
+	catch (...)
+	{
+		sem_post(sem);
+	}
+}
+
 int main(int argc, char** argv)
 {
-    int shmid;
-    QueueExtension *broker;
-    shmid = shmget(SHM_KEY, sizeof(QueueExtension), perms);
-    cout << shmid << endl;
-    broker = (QueueExtension*) shmat(shmid, NULL, 0);
+    int shmid = shmget(SHM_KEY, sizeof(QueueExtension), perms);
+    QueueExtension *broker = (QueueExtension*) shmat(shmid, NULL, 0);
 
     sem_t* sem = sem_open(SEMAPHORE_NAME, O_RDWR);
     
-    int type = 1;
+    int type = atoi(argv[1]);
     string typeName = type == 1 ? "producer" : "consumer";
     cout << "I am " << argv[0] << " (" << typeName << ") My PID is " << getpid() << endl;
 
@@ -96,18 +100,18 @@ int main(int argc, char** argv)
         if(type == 1)
         {
             Message m = generateMessage();
-            sem_wait(sem);
-            addMessage(broker, m);
-            sem_post(sem);
-            cout << "PID " << getpid() << " puts message" << endl;
+            lockAction(sem, [&]() {
+                if(tryAddMessage(broker, m))
+                    cout << "PID " << getpid() << " puts message" << endl; 
+            });
         }
         else
         {
             Message m;
-            sem_wait(sem);
-            if(tryReadMessage(broker, &m))
-                cout << "Message " << broker->outCount << " readed " << "data: " << m.data << endl;
-            sem_post(sem);
+            lockAction(sem, [&]() {
+                if(tryReadMessage(broker, &m))
+                    cout << "Message " << broker->outCount << " readed " << "data: " << m.data << endl; 
+            });
         }
         sleep(2);
     }
