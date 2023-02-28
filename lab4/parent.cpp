@@ -5,10 +5,11 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/mman.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <semaphore.h>
-#include <queue>
+#include <vector>
 #include <sys/shm.h>
 #include "datastruct.h"
 #define CHILD_PATH "./"
@@ -24,7 +25,7 @@ string childName(int childNumber)
     return CHILD_PROGRAM_NAME + to_string(childNumber);
 }
 
-void createChildProcess(char* programPath, char** argv, char** envp)
+pid_t createChildProcess(char* programPath, char** argv, char** envp)
 {
     pid_t p = fork();
     
@@ -36,6 +37,7 @@ void createChildProcess(char* programPath, char** argv, char** envp)
     {
         cout << "Parent PID = " << getpid() << endl;
     }   
+    return p;
 }
 
 char* childProgramPath()
@@ -69,6 +71,7 @@ int main(int argc, char** argv, char** envp)
 
     int childProcessesCount = 0;
 
+    vector<pid_t> processes;
     char ch;
     while(1)
     {
@@ -77,14 +80,24 @@ int main(int argc, char** argv, char** envp)
         cin.clear();
         cin >> ch;
         
-        int type = ch == 'p' ? 1 : 0;
+        int type;
+        if(ch == 'p') type = 1;
+        else if(ch == 'c') type = 0;
+        else break;
 
         string cName = childName(childProcessesCount++);
         char** cArgv = createChildProcessArgv(cName.c_str(), type);
         char* programPath = childProgramPath();
 
-        createChildProcess(programPath, cArgv, envp);
+        pid_t childPid = createChildProcess(programPath, cArgv, envp);
+        processes.push_back(childPid);
     }
+
+    for(auto pid : processes) kill(pid, SIGKILL);
+
+    sem_close(sem);
+    sem_destroy(sem);
+    close(shmid);
 
     return 0;   
 }

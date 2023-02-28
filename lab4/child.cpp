@@ -4,7 +4,6 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <string.h>
-#include <queue>
 #include <sys/shm.h>
 #include <semaphore.h>
 #include <stdio.h>
@@ -102,7 +101,7 @@ int main(int argc, char** argv)
             Message m = generateMessage();
             lockAction(sem, [&]() {
                 if(tryAddMessage(broker, m))
-                    cout << "PID " << getpid() << " puts message" << endl; 
+                    cout << argv[0] << "(PID " << getpid() << ") puts message" << endl; 
             });
         }
         else
@@ -110,7 +109,7 @@ int main(int argc, char** argv)
             Message m;
             lockAction(sem, [&]() {
                 if(tryReadMessage(broker, &m))
-                    cout << "Message " << broker->outCount << " readed " << "data: " << m.data << endl; 
+                    cout << "Message " << broker->outCount << " readed (" << argv[0] << ") data: " << m.data << endl; 
             });
         }
         sleep(2);
