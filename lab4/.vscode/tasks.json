@@ -6,6 +6,7 @@
             "command": "/usr/bin/g++",
             "args": [
                 "-fdiagnostics-color=always",
+                "-pthread",
                 "-g",
                 "${file}",
                 "-o",
@@ -15,7 +16,7 @@
                 "cwd": "${fileDirname}"
             },
             "problemMatcher": [
-                "$gcc"
+                "$g++"
             ],
             "group": {
                 "kind": "build",

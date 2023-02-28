@@ -14,7 +14,8 @@
     "-Wformat=2",
     "-Wconversion",
     "-Wnull-dereference",
-    "-Wsign-conversion"
+    "-Wsign-conversion",
+    "-pthread"
   ],
   "C_Cpp_Runner.enableWarnings": true,
   "C_Cpp_Runner.warningsAsError": false,
@@ -35,7 +36,10 @@
   ],
   "C_Cpp_Runner.useAddressSanitizer": false,
   "files.associations": {
-    "typeinfo": "cpp",
-    "new": "cpp"
+    "array": "cpp",
+    "string": "cpp",
+    "string_view": "cpp",
+    "iostream": "cpp",
+    "ostream": "cpp"
   }
 }
