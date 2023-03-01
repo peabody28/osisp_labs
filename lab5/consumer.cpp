@@ -1,16 +1,18 @@
 #include "consumer.h"
+#include "node.h"
+#include <string>
 
-Consumer::Consumer(int id) : Node(id) {}
+Consumer::Consumer(int id) : Node(id, NodeType::Cons) {}
 
-int Consumer::getId()
-{
-    return id;
-}
-
-bool Consumer::tryReadMessage(QueueExtension *broker, Message* msg)
+bool Consumer::action(QueueExtension *broker, Message* msg)
 {
     if(broker->isEmpty())
         return false;
     *msg = broker->pop();
     return true;
+}
+
+std::string Consumer::actionMessage(QueueExtension* broker)
+{
+    return "Message " + to_string(broker->outCount) + " readed";
 }

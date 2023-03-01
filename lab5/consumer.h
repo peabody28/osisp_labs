@@ -1,4 +1,7 @@
 #pragma once
+#ifndef consumer_H
+#define consumer_H
+
 #include <iostream>
 #include <string>
 #include <string.h>
@@ -14,5 +17,9 @@ public:
 
     int getId();
 
-    bool tryReadMessage(QueueExtension *broker, Message* msg);
+    bool action(QueueExtension *broker, Message* msg) override;
+
+    string actionMessage(QueueExtension* broker) override;
 };
+
+#endif

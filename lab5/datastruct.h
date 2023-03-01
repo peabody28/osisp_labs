@@ -1,4 +1,7 @@
 #pragma once
+#ifndef datastruct_H
+#define datastruct_H
+
 class Message
 {
 public:
@@ -6,6 +9,8 @@ public:
     short hash; // hashsum
     char size;
     char data[255];
+
+    Message();
 };
 
 class QueueExtension
@@ -21,3 +26,5 @@ public:
 
     bool isEmpty();
 };
+
+#endif

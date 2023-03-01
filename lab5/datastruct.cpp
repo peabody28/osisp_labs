@@ -18,5 +18,5 @@ Message QueueExtension::pop()
 
 bool QueueExtension::isEmpty()
 {
-    return inCount == outCount;
+    return inCount < outCount;
 }

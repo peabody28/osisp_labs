@@ -1,23 +1,22 @@
  #include "producer.h"
 
- Producer::Producer(int id) : Node(id) {}
+Producer::Producer(int id) : Node(id, NodeType::Prod) {}
 
-int Producer::getId()
+bool Producer::action(QueueExtension *broker, Message* m)
 {
-    return id;
+    if(broker->inCount - broker->outCount >= 255)
+        return false;
+    broker->push(*m);
+    return true;
 }
 
-bool Producer::tryAddMessage(QueueExtension *broker, Message m)
+std::string Producer::actionMessage(QueueExtension *broker)
 {
-    if(broker->inCount >= 255)
-        return false;
-    broker->push(m);
-    return true;
+    return "Puts " + to_string(broker->inCount) + " message";
 }
 
 char* Producer::randstring(int length) 
 {
-
     static char charset[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789,.-#'?!";        
     char *randomString = NULL;
 
@@ -38,16 +37,19 @@ char* Producer::randstring(int length)
     return randomString;
 }
 
-Message Producer::generateMessage()
+Message* Producer::generateMessage()
 {
-    Message m;
+    Message* m = new Message();
     int num = rand();
     int size = num % 257;
-    m.size = size;
-    int dataSize = ((size+3)/4)*4;    
+    m->size = size;
+    int dataSize;
+    
+    while(!(dataSize = ((size+3)/4)*4))
+        ;    
 
-    strcpy(m.data, randstring(dataSize));
+    strcpy(m->data, randstring(dataSize));
 
-    m.hash = dataSize + m.size;
+    m->hash = dataSize + m->size;
     return m;
 }

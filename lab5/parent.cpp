@@ -3,6 +3,7 @@
 #include <string>
 #include <string.h>
 #include <vector>
+#include "node.h"
 #include "consumer.h"
 #include "producer.h"
 #include <thread>
@@ -12,12 +13,6 @@
 using namespace std;
 
 std::mutex g_lock;
-
-struct NodeThread
-{
-    Node* node;
-    thread::id thread_id;
-};
 
 void lockAction(const std::function<void()>& f)
 {
@@ -33,34 +28,25 @@ void lockAction(const std::function<void()>& f)
 	}
 }
 
-void listenMessage(Consumer c, QueueExtension* broker)
+void action(Node* node, QueueExtension* broker)
 {
     while(1)
     {
-        Message m;
+        Message* msg = node->type == NodeType::Prod ? Producer::generateMessage() : new Message();
         lockAction([&](){
-            if(c.tryReadMessage(broker, &m))
-                cout << "Message " << broker->outCount << " readed" << endl; 
+            if(node->action(broker, msg))
+                cout << node->actionMessage(broker) << endl; 
         });
-        
+        free(msg);
         sleep(2);
     }
 }
 
-void writeMessage(Producer p, QueueExtension* broker)
+Node* nodeResolver(char type, int producersCount, int consumersCount)
 {
-    while(1)
-    {
-        Message m = p.generateMessage();
-        lockAction([&](){
-            if(p.tryAddMessage(broker, m))
-                cout << "Puts" << broker->inCount << " message" << endl; 
-        });
-        
-        sleep(2);
-    }
+    Node* node = type == 'p' ? (Node*)new Producer(producersCount) : (Node*)new Consumer(consumersCount);
+    return node;
 }
-
 
 int main(int argc, char** argv, char** envp)
 {
@@ -71,7 +57,7 @@ int main(int argc, char** argv, char** envp)
     int consumerCount = 0;
     int producerCount = 0;
 
-    vector<NodeThread> nodeThreads;
+    vector<thread> threads;
     while(1)
     {
         cout << endl << endl << "Input character: ";
@@ -79,31 +65,9 @@ int main(int argc, char** argv, char** envp)
         cin.clear();
         cin >> ch;
         
-        int type;
-        if(ch == 'p')
-        {
-            Producer* p = new Producer(producerCount++);
-            thread th(writeMessage, p, broker);
-            struct NodeThread nt;
-            nt.node = p;
-            nt.thread_id = th.get_id();
+        Node* node = nodeResolver(ch, producerCount, consumerCount);
 
-            nodeThreads.push_back(nt);
-        }
-        else if(ch == 'c')
-        {
-            Consumer* c = new Consumer(consumerCount++);
-            thread th(listenMessage, c, broker);
-
-            struct NodeThread nt;
-            nt.node = c;
-            nt.thread_id = th.get_id();
-            
-            nodeThreads.push_back(nt);
-        }
-        else
-            break;
-
+        threads.emplace_back(action, node, broker);
     }
 
     return 0;   
