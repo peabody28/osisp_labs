@@ -7,16 +7,19 @@ Message::Message()
 
 void QueueExtension::push(Message m)
 {
-    messages[inCount-outCount] = m;
+    messages.push(m);
     inCount++;
 }
 
 Message QueueExtension::pop()
 {
-    return messages[inCount - outCount++ -1];
+    Message m = messages.front();
+    messages.pop();
+    outCount++;
+    return m;
 }
 
 bool QueueExtension::isEmpty()
 {
-    return inCount < outCount;
+    return messages.empty();
 }

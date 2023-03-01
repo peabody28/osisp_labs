@@ -4,8 +4,6 @@ Producer::Producer(int id) : Node(id, NodeType::Prod) {}
 
 bool Producer::action(QueueExtension *broker, Message* m)
 {
-    if(broker->inCount - broker->outCount >= 255)
-        return false;
     broker->push(*m);
     return true;
 }

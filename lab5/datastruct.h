@@ -1,6 +1,7 @@
 #pragma once
 #ifndef datastruct_H
 #define datastruct_H
+#include <queue>
 
 class Message
 {
@@ -16,7 +17,7 @@ public:
 class QueueExtension
 {
 public:
-    Message messages[255];
+    std::queue<Message> messages;
     int inCount = 0;
     int outCount = 0;
     
