@@ -19,9 +19,10 @@ bool isBusy = false;
 
 void lockAction(const std::function<void()>& f)
 {
+    std::unique_lock<std::mutex> lk(g_lock);
+
     try
 	{
-		std::unique_lock<std::mutex> lk(g_lock);
         cv.wait(lk, []{ return !isBusy;});
         isBusy = true;
 
