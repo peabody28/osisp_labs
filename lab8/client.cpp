@@ -2,9 +2,10 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
+#include <string>
 #include <iostream>
 #define SOCKET_BIND_PORT -1
-#define SERVER_PORT 8080
+#define SERVER_PORT 8081
 
 using namespace std;
 
@@ -49,12 +50,12 @@ void disconnect(int socketDesc)
     close(socketDesc);
 }
 
-void sendRequest(sockaddr* serverSocketAddress, char* data, int len)
+void sendRequest(sockaddr* serverSocketAddress, const char* data, int len)
 {
     int socketDesc = connectToServer(serverSocketAddress);
 
     send(socketDesc, data, len, 0);
-    cout << "message: " << data << " sended" << endl;
+    cout << "message: " << data << " len:" << len << " sended" << endl;
 
     char buf[len];
     recv(socketDesc, buf, len, 0);
@@ -67,12 +68,13 @@ int main()
 {
     sockaddr* serverSocketAddress = getServerSocketAddress(INADDR_LOOPBACK, SERVER_PORT);
 
-    char message[] = "mama mila ramu";
-
     while(true)
     {
-        sendRequest(serverSocketAddress, message, sizeof(message));
-        sleep(2);
+        string message;
+        cout << "input request (example: \"GET /echo somestring\"): " << endl;
+        getline(cin, message);
+        
+        sendRequest(serverSocketAddress, message.c_str(), message.size());
     }
 
     return 0;

@@ -3,8 +3,18 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include <iostream>
-#define SOCKET_BIND_PORT 8080
+#include <string.h>
+#include <algorithm>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
+#define SOCKET_BIND_PORT 8081
 #define REQUEST_QUEUE_SIZE 128
+#define MESSAGE_BUFFER_SIZE 1024
+
+std::mutex g_lock;
+std::condition_variable cv;
+bool isSocketFree = true;
 
 using namespace std;
 
@@ -60,9 +70,9 @@ int acceptRequest(int listenerSocketDescriptor)
     sockaddr clientSocketAddress; // две переменные, хранящие инфу о адресе клиента...
     socklen_t clientSocketAddressLen; //... вместо ссылок на них можно использовать NULL (так как они не юзаются тут)
 
-    cout << "request from accepted" << endl;
     int newSocketDescriptor = accept(listenerSocketDescriptor, &clientSocketAddress, &clientSocketAddressLen);
-    
+    cout << "request from accepted" << endl;
+
     if(newSocketDescriptor < 0)
     {
         perror("accept");
@@ -72,45 +82,117 @@ int acceptRequest(int listenerSocketDescriptor)
     return newSocketDescriptor;
 }
 
-void echoRequestHandler(int socketDesc)
+string getRequestRoute(char* buffer)
 {
-    char messageBuf[1024];
+    // Получение пути запроса
+    std::string requestPath;
+    char* pathStart = strchr(buffer, ' ') + 1;  // Начало пути после первого пробела
+    char* pathEnd = strchr(pathStart, ' ');  // Конец пути перед вторым пробелом
+    if (pathStart != nullptr && pathEnd != nullptr)
+        requestPath.assign(pathStart, pathEnd - pathStart);
 
-    while(1)
-    {
-        ssize_t bytes_read = recv(socketDesc, messageBuf, 1024, 0);
-        if(bytes_read <= 0)
-            break;
-        send(socketDesc, messageBuf, bytes_read, 0);
-    }
+    return requestPath;
 }
 
-void(*getRequestHandler())(int socketDesc)
+string getData(const char* buffer)
 {
-    return echoRequestHandler;
+    char* bufferCopy = new char[1024];
+    strcpy(bufferCopy, buffer);
+
+    std::string requestPath;
+    char* secondSpace = strchr(strchr(bufferCopy, ' ') + 1, ' ');
+
+    return string(secondSpace);
+}
+
+void echoRequestHandler(int socketDesc, string data)
+{
+    send(socketDesc, data.c_str(), data.size()+1, 0);
+}
+
+void reverseRequestHandler(int socketDesc, string data)
+{
+    string dataCopy(data);
+
+    reverse(dataCopy.begin(), dataCopy.end());
+
+    send(socketDesc, dataCopy.c_str(), dataCopy.size()+1, 0);
+}
+
+void(*getRequestHandler(string path))(int sockDesc, string data)
+{
+    if(!path.compare("/echo"))
+        return echoRequestHandler;
+    else if(!path.compare("/reverse"))
+        return reverseRequestHandler;
+    
+    perror("endpoint not exists");
+    exit(1);
+}
+
+void lockAction(const std::function<void()>& f)
+{
+    std::unique_lock<std::mutex> lk(g_lock);
+
+    try
+	{
+        cv.wait(lk, []{ return isSocketFree;});
+        isSocketFree = false;
+
+		f();
+		
+        isSocketFree = true;
+        lk.unlock();
+        cv.notify_one();
+	}
+	catch (...)
+	{
+		isSocketFree = true;
+        lk.unlock();
+        cv.notify_one();
+	}
+}
+
+void handleRequest(int socketDesc)
+{
+    char* messageBuf = new char[MESSAGE_BUFFER_SIZE];
+
+    lockAction([&]
+    {
+        recv(socketDesc, messageBuf, MESSAGE_BUFFER_SIZE, 0);
+    });
+
+    string path = getRequestRoute(messageBuf);
+    string data = getData(messageBuf);
+
+    auto requestHandler = getRequestHandler(path);
+
+    lockAction([&]
+    {
+        requestHandler(socketDesc, data);
+        close(socketDesc);
+    });
+   
+    free(messageBuf);
 }
 
 int main()
 {
-    auto requestHandler = getRequestHandler(); // обработчик запроса задается ссылкой на функцию
-
     int listenerSocketDescriptor = createListenerSocket();
-
     sockaddr* listenerSocketAddress = getAddressForBindListenerSocket(INADDR_LOOPBACK, SOCKET_BIND_PORT);
-
 	bindSocketTo(listenerSocketDescriptor, listenerSocketAddress);
-
     listenRequests(listenerSocketDescriptor);
 
+    std::vector<std::thread> threads;
     while(1)
     {
         int newSocketDescriptor = acceptRequest(listenerSocketDescriptor);
 
-        // поместить в отдельный поток (также в идеале нужно ограничить кол-во создаваемых потоков например до 1к)
-        requestHandler(newSocketDescriptor);
-    
-        close(newSocketDescriptor);
+        threads.emplace_back(handleRequest, newSocketDescriptor);
+        threads.back().detach();
     }
+
+    close(listenerSocketDescriptor);
 
     return 0;
 }
