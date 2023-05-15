@@ -17,6 +17,7 @@ int createListenerSocket()
         perror("socket");
         exit(1);
     }
+    cout << "socket created" << endl;
 
     return sockerDesc;
 }
@@ -34,7 +35,12 @@ sockaddr* getAddressForBindListenerSocket(long ip, int port)
 void bindSocketTo(int listenerSocketDescriptor, sockaddr *address)
 {
     int len = sizeof(sockaddr);
-    bind(listenerSocketDescriptor, address, len);
+    if(bind(listenerSocketDescriptor, address, len) != 0)
+    {
+        perror("bind");
+        exit(1);
+    }
+    cout << "socket binded" << endl;
 }
 
 void listenRequests(int listenerSocketDescriptor)
@@ -44,6 +50,8 @@ void listenRequests(int listenerSocketDescriptor)
         perror("listen");
         exit(1);
     }
+
+    cout << "start listen..." << endl;
 }
 
 /// @return new socket descriptor 
@@ -52,6 +60,7 @@ int acceptRequest(int listenerSocketDescriptor)
     sockaddr clientSocketAddress; // две переменные, хранящие инфу о адресе клиента...
     socklen_t clientSocketAddressLen; //... вместо ссылок на них можно использовать NULL (так как они не юзаются тут)
 
+    cout << "request from accepted" << endl;
     int newSocketDescriptor = accept(listenerSocketDescriptor, &clientSocketAddress, &clientSocketAddressLen);
     
     if(newSocketDescriptor < 0)
