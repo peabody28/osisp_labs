@@ -8,6 +8,7 @@
 #include <thread>
 #include <vector>
 #include <signal.h>
+#include <cstring>
 #define SOCKET_BIND_PORT 8081
 #define REQUEST_QUEUE_SIZE 128
 #define MESSAGE_BUFFER_SIZE 1024
@@ -112,13 +113,36 @@ void reverseRequestHandler(int socketDesc, string data)
     send(socketDesc, dataCopy.c_str(), dataCopy.size()+1, 0);
 }
 
+void upperRequestHandler(int sockDesc, string data)
+{
+    string dataCopy(data);
+
+    for (int i = 0; i < dataCopy.length(); i++)
+        dataCopy[i] = toupper(dataCopy[i]);
+
+    send(sockDesc, dataCopy.c_str(), dataCopy.size()+1, 0);
+}
+
+void lowerRequestHandler(int sockDesc, string data)
+{
+    string dataCopy(data);
+
+    for (int i = 0; i < dataCopy.length(); i++)
+        dataCopy[i] = tolower(dataCopy[i]);
+
+    send(sockDesc, dataCopy.c_str(), dataCopy.size()+1, 0);
+}
+
 void(*getRequestHandler(string path))(int sockDesc, string data)
 {
     if(!path.compare("/echo"))
         return echoRequestHandler;
     else if(!path.compare("/reverse"))
         return reverseRequestHandler;
-    
+    else if(!path.compare("/upper"))
+        return upperRequestHandler;
+    else if(!path.compare("/lower"))
+        return lowerRequestHandler;
     perror("endpoint not exists");
     exit(1);
 }
