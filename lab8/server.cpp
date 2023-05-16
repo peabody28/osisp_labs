@@ -6,16 +6,10 @@
 #include <string.h>
 #include <algorithm>
 #include <thread>
-#include <mutex>
-#include <condition_variable>
+#include <vector>
 #define SOCKET_BIND_PORT 8081
 #define REQUEST_QUEUE_SIZE 128
 #define MESSAGE_BUFFER_SIZE 1024
-
-std::mutex g_lock;
-std::condition_variable cv;
-bool isSocketFree = true;
-
 using namespace std;
 
 /// @return socket descriptor 
@@ -67,17 +61,15 @@ void listenRequests(int listenerSocketDescriptor)
 /// @return new socket descriptor 
 int acceptRequest(int listenerSocketDescriptor)
 {
-    sockaddr clientSocketAddress; // две переменные, хранящие инфу о адресе клиента...
-    socklen_t clientSocketAddressLen; //... вместо ссылок на них можно использовать NULL (так как они не юзаются тут)
-
-    int newSocketDescriptor = accept(listenerSocketDescriptor, &clientSocketAddress, &clientSocketAddressLen);
-    cout << "request from accepted" << endl;
+    int newSocketDescriptor = accept(listenerSocketDescriptor, NULL, NULL);
 
     if(newSocketDescriptor < 0)
     {
         perror("accept");
         exit(3);
     }
+
+    cout << "request from accepted";
 
     return newSocketDescriptor;
 }
@@ -130,48 +122,19 @@ void(*getRequestHandler(string path))(int sockDesc, string data)
     exit(1);
 }
 
-void lockAction(const std::function<void()>& f)
-{
-    std::unique_lock<std::mutex> lk(g_lock);
-
-    try
-	{
-        cv.wait(lk, []{ return isSocketFree;});
-        isSocketFree = false;
-
-		f();
-		
-        isSocketFree = true;
-        lk.unlock();
-        cv.notify_one();
-	}
-	catch (...)
-	{
-		isSocketFree = true;
-        lk.unlock();
-        cv.notify_one();
-	}
-}
-
 void handleRequest(int socketDesc)
 {
     char* messageBuf = new char[MESSAGE_BUFFER_SIZE];
 
-    lockAction([&]
-    {
-        recv(socketDesc, messageBuf, MESSAGE_BUFFER_SIZE, 0);
-    });
+    recv(socketDesc, messageBuf, MESSAGE_BUFFER_SIZE, 0);
 
     string path = getRequestRoute(messageBuf);
     string data = getData(messageBuf);
 
     auto requestHandler = getRequestHandler(path);
 
-    lockAction([&]
-    {
-        requestHandler(socketDesc, data);
-        close(socketDesc);
-    });
+    requestHandler(socketDesc, data);
+    close(socketDesc);
    
     free(messageBuf);
 }
