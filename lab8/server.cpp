@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <thread>
 #include <vector>
+#include <signal.h>
 #define SOCKET_BIND_PORT 8081
 #define REQUEST_QUEUE_SIZE 128
 #define MESSAGE_BUFFER_SIZE 1024
@@ -139,8 +140,15 @@ void handleRequest(int socketDesc)
     free(messageBuf);
 }
 
+void setupStopHandler(int sig)
+{
+    cout << "exited" << endl;
+    exit(EXIT_SUCCESS);
+}
+
 int main()
 {
+    signal(SIGINT, setupStopHandler);
     int listenerSocketDescriptor = createListenerSocket();
     sockaddr* listenerSocketAddress = getAddressForBindListenerSocket(INADDR_LOOPBACK, SOCKET_BIND_PORT);
 	bindSocketTo(listenerSocketDescriptor, listenerSocketAddress);
