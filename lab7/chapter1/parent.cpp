@@ -40,9 +40,9 @@ void lockAction(const std::function<void()>& f)
 	}
 }
 
-void action(Node* node, QueueExtension* broker)
+void action(Node* node, QueueExtension* broker, bool* cancellationToken)
 {
-    while(1)
+    while(!(*cancellationToken))
     {
         Message* msg = node->type == NodeType::Prod ? Producer::generateMessage() : new Message();
         lockAction([&](){
@@ -52,6 +52,7 @@ void action(Node* node, QueueExtension* broker)
         free(msg);
         sleep(2);
     }
+    cout << "Thread exited" << endl;
 }
 
 Node* nodeResolver(char type, int producersCount, int consumersCount)
@@ -70,16 +71,34 @@ int main(int argc, char** argv, char** envp)
     int producerCount = 0;
 
     vector<thread> threads;
+    vector<bool*> cancellationTokens;
     while(1)
     {
-        cout << endl << endl << "Input character: ";
+        cout << endl << endl << "Input character: "  << endl;
 
         cin.clear();
         cin >> ch;
         
-        Node* node = nodeResolver(ch, producerCount, consumerCount);
+        if(ch == 'k')
+        {
+            if(!threads.size())
+                cout << "No one thread here" << endl;
+            else
+            {
+                *cancellationTokens.back() = true;
+                cancellationTokens.pop_back();
+                threads.back().join();
+                threads.pop_back();
+            }
+        }
+        else
+        {
+            Node* node = nodeResolver(ch, producerCount, consumerCount);
 
-        threads.emplace_back(action, node, broker);
+            bool* cancellationToken = new bool;
+            cancellationTokens.push_back(cancellationToken);
+            threads.emplace_back(action, node, broker, cancellationToken);
+        }
     }
 
     return 0;   
